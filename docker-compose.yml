@@ -1,0 +1,108 @@
+# LOCAL DEVELOPMENT ONLY — nothing here touches a real AWS account.
+#   docker compose up -d postgres migrate localstack      # dependencies only, then: dotnet run --project RouteGo.Booking.Api
+#   docker compose up -d --build                          # the above plus Booking itself on :5005
+#
+# Booking calls Seat Inventory (:5004) and Payment (:5006) and checks tokens against Identity (:5001); run those
+# from their own repos. From inside this compose network they are reached through host.docker.internal.
+# Payment's own compose file already creates booking-payment-q and payment-refund-q; the init script here is
+# idempotent, so running both stacks against one LocalStack is fine (set LOCALSTACK_PORT when 4566 is taken).
+#
+# The EC2 deployment uses deploy/ec2/ on routego-core, not this file.
+#
+# Class demo settings: the hold is 60 seconds locally (see local/localstack/init-aws.sh), so an unpaid booking
+# expires within a minute. Change a setting and see it apply within 60 s, with no restart:
+#   docker compose exec localstack awslocal ssm put-parameter --overwrite --type String \
+#        --name /routego/prod/booking/hold-seconds --value 120
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: routego_booking
+      POSTGRES_USER: booking_user
+      POSTGRES_PASSWORD: booking_local   # local-only throwaway password
+    ports:
+      - "5434:5432"   # not 5432/5433: the other RouteGo services publish those
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U booking_user -d routego_booking"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Applies migrations/ once Postgres is up, then exits. Re-run any time: docker compose run --rm migrate
+  migrate:
+    image: postgres:17
+    command: ["bash", "/local/apply-migrations.sh"]
+    environment:
+      PGHOST: postgres
+      PGDATABASE: routego_booking
+      PGUSER: booking_user
+      PGPASSWORD: booking_local
+    volumes:
+      - ./migrations:/migrations:ro
+      - ./local/apply-migrations.sh:/local/apply-migrations.sh:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  localstack:
+    image: localstack/localstack:4.4
+    environment:
+      SERVICES: sqs,sns,ssm,secretsmanager
+      AWS_DEFAULT_REGION: ap-south-1
+    ports:
+      - "${LOCALSTACK_PORT:-4566}:4566"
+    volumes:
+      # Runs once LocalStack is ready: creates the topics, the queues + DLQs, the subscriptions and the settings.
+      - ./local/localstack/init-aws.sh:/etc/localstack/init/ready.d/init-aws.sh:ro
+    healthcheck:
+      # Healthy only after the init script has created its last queue.
+      test: ["CMD-SHELL", "awslocal sqs get-queue-url --queue-name reporting-q >/dev/null 2>&1"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  booking:
+    build: .
+    image: routego/booking:local
+    ports:
+      - "5005:8080"
+    environment:
+      # Development: SecretResolver reads secrets from configuration (these env vars), never AWS.
+      ASPNETCORE_ENVIRONMENT: Development
+      AWS_ACCESS_KEY_ID: test
+      AWS_SECRET_ACCESS_KEY: test
+      # Inside the compose network the other services are not on localhost.
+      AwsServiceUrl: http://localstack:4566
+      IdentityJwksUrl: http://host.docker.internal:5001/.well-known/jwks.json
+      IdentityIssuer: http://localhost:5001
+      IdentityAudience: routego
+      SeatInventoryBaseUrl: http://host.docker.internal:5004/
+      PaymentBaseUrl: http://host.docker.internal:5006/
+      SettingsPath: /routego/prod/booking/
+      BookingEventsTopicArn: arn:aws:sns:ap-south-1:000000000000:routego-booking-events
+      AuditEventsTopicArn: arn:aws:sns:ap-south-1:000000000000:routego-audit-events
+      PaymentQueueUrl: http://localstack:4566/000000000000/booking-payment-q
+      PaymentDeadLetterQueueUrl: http://localstack:4566/000000000000/booking-payment-dlq
+      InventoryQueueUrl: http://localstack:4566/000000000000/booking-inventory-q
+      InventoryDeadLetterQueueUrl: http://localstack:4566/000000000000/booking-inventory-dlq
+      FleetQueueUrl: http://localstack:4566/000000000000/booking-fleet-q
+      FleetDeadLetterQueueUrl: http://localstack:4566/000000000000/booking-fleet-dlq
+      DB_CONNECTION_PROFILE: ManagedInstances
+      DB_MAX_POOL_SIZE: "10"
+      # The database secret, under its fixed name (Infrastructure/Pgsql/DbSecret.cs), in the platform JSON shape.
+      database/postgresql/routego-booking-api: '{"host":"postgres","port":5432,"database":"routego_booking","username":"booking_user","password":"booking_local","sslmode":"disable"}'
+      # The internal key Booking presents to Seat Inventory and Payment. Local-only throwaway value.
+      routego/internal-key: local-internal-key
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      localstack:
+        condition: service_healthy
+
+volumes:
+  postgres-data:

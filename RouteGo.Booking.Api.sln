@@ -1,0 +1,37 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RouteGo.Booking.Api", "RouteGo.Booking.Api\RouteGo.Booking.Api.csproj", "{63282FF3-7EA0-4385-8C94-94014C258437}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RouteGo.Booking.Api.Tests", "RouteGo.Booking.Api.Tests\RouteGo.Booking.Api.Tests.csproj", "{E71DE9A5-1CEC-428B-B01B-0BB505B0A36E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "RouteGo.Booking.Api.AppHost", "RouteGo.Booking.Api.AppHost\RouteGo.Booking.Api.AppHost.csproj", "{EB44A80E-DD56-416A-8E7B-BC2D3CD9B02E}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{63282FF3-7EA0-4385-8C94-94014C258437}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{63282FF3-7EA0-4385-8C94-94014C258437}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{63282FF3-7EA0-4385-8C94-94014C258437}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{63282FF3-7EA0-4385-8C94-94014C258437}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E71DE9A5-1CEC-428B-B01B-0BB505B0A36E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E71DE9A5-1CEC-428B-B01B-0BB505B0A36E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E71DE9A5-1CEC-428B-B01B-0BB505B0A36E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E71DE9A5-1CEC-428B-B01B-0BB505B0A36E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EB44A80E-DD56-416A-8E7B-BC2D3CD9B02E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EB44A80E-DD56-416A-8E7B-BC2D3CD9B02E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EB44A80E-DD56-416A-8E7B-BC2D3CD9B02E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EB44A80E-DD56-416A-8E7B-BC2D3CD9B02E}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {56AD31F8-94C7-42C7-B3EC-754DE2D64BCB}
+	EndGlobalSection
+EndGlobal

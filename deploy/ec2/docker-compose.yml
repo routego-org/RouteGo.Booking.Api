@@ -1,0 +1,65 @@
+# EC2 deployment of the Booking API (routego-core). Started by start.sh, which reads the database
+# connection from Secrets Manager first — there is no .env file for this service.
+# Real AWS is used here: Secrets Manager, SSM, SQS and SNS through the EC2 instance role (routego-core-role).
+#
+# Booking is internal: the Web Portal calls it on port 5005 over the private network (sg-core admits
+# sg-edge and sg-core), and Nginx does not route to it. Seat Inventory and Payment are reached on their
+# private addresses; Payment lives on routego-secure.
+name: routego-booking
+services:
+  # One-shot helper: applies the SQL migrations, then exits. It is not a long-running container.
+  migrate:
+    image: postgres:17
+    command: ["bash", "/deploy/apply-migrations.sh"]
+    environment:
+      PGHOST: ${BOOKING_DB_HOST:?run start.sh, which reads it from Secrets Manager}
+      PGPORT: ${BOOKING_DB_PORT:?run start.sh}
+      PGDATABASE: ${BOOKING_DB_NAME:?run start.sh}
+      PGUSER: ${BOOKING_DB_USER:?run start.sh}
+      PGPASSWORD: ${BOOKING_DB_PASSWORD:?run start.sh}
+      PGSSLMODE: ${BOOKING_DB_SSLMODE:-require}
+    volumes:
+      - ../../migrations:/migrations:ro
+      - ./apply-migrations.sh:/deploy/apply-migrations.sh:ro
+
+  booking:
+    image: routego/booking:latest
+    restart: unless-stopped
+    ports:
+      - "5005:8080"
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      AWS_REGION: ap-south-1
+      # An always-on process serving concurrent requests; 10 connections is plenty on one small server.
+      DB_CONNECTION_PROFILE: ManagedInstances
+      DB_MAX_POOL_SIZE: "10"
+      # Identity: where the signing keys are published, and what a token must name.
+      IdentityJwksUrl: ${IDENTITY_JWKS_URL:?run start.sh with IDENTITY_JWKS_URL, e.g. http://10.0.1.20:5001/.well-known/jwks.json}
+      IdentityIssuer: ${IDENTITY_ISSUER:?run start.sh with IDENTITY_ISSUER}
+      IdentityAudience: ${IDENTITY_AUDIENCE:-routego}
+      # The services Booking calls, on their private addresses; each must end in a slash.
+      SeatInventoryBaseUrl: ${SEAT_INVENTORY_BASE_URL:?run start.sh with SEAT_INVENTORY_BASE_URL, e.g. http://10.0.1.30:5004/}
+      PaymentBaseUrl: ${PAYMENT_BASE_URL:?run start.sh with PAYMENT_BASE_URL, e.g. http://10.0.1.40:5006/}
+      # The business settings live in SSM Parameter Store; changes apply within a minute, no restart.
+      SettingsPath: /routego/prod/booking/
+      BookingEventsTopicArn: arn:aws:sns:ap-south-1:${AWS_ACCOUNT_ID:?run start.sh}:routego-booking-events
+      AuditEventsTopicArn: arn:aws:sns:ap-south-1:${AWS_ACCOUNT_ID}:routego-audit-events
+      PaymentQueueUrl: https://sqs.ap-south-1.amazonaws.com/${AWS_ACCOUNT_ID}/booking-payment-q
+      PaymentDeadLetterQueueUrl: https://sqs.ap-south-1.amazonaws.com/${AWS_ACCOUNT_ID}/booking-payment-dlq
+      InventoryQueueUrl: https://sqs.ap-south-1.amazonaws.com/${AWS_ACCOUNT_ID}/booking-inventory-q
+      InventoryDeadLetterQueueUrl: https://sqs.ap-south-1.amazonaws.com/${AWS_ACCOUNT_ID}/booking-inventory-dlq
+      FleetQueueUrl: https://sqs.ap-south-1.amazonaws.com/${AWS_ACCOUNT_ID}/booking-fleet-q
+      FleetDeadLetterQueueUrl: https://sqs.ap-south-1.amazonaws.com/${AWS_ACCOUNT_ID}/booking-fleet-dlq
+      # Workstation GC: a server-GC heap per core is too much on a small instance.
+      DOTNET_gcServer: "0"
+    logging:
+      driver: json-file
+      options: { max-size: "10m", max-file: "3" }
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+networks:
+  default:
+    name: ec2_default
+    external: true

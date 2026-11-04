@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <Sdk Name="Aspire.AppHost.Sdk" Version="13.4.6" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsAspireHost>true</IsAspireHost>
+    <UserSecretsId>18c327c6-9e50-4534-bda4-2122c7122de2</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Aspire AppHost — dev-only local orchestrator (references/aspire-local-dev.md).
+         Pinned + kept on one major line (the SDK above and this package must match). -->
+    <PackageReference Include="Aspire.Hosting.AppHost" Version="13.4.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- One-way: the AppHost references the app; the app NEVER references the AppHost or Aspire. -->
+    <ProjectReference Include="..\RouteGo.Booking.Api\RouteGo.Booking.Api.csproj" />
+  </ItemGroup>
+</Project>
