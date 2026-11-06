@@ -16,9 +16,20 @@ internal static class BookingTestHost
     // The same value in every host of a run: the environment block is process-global.
     private const string TestInternalKey = "test-internal-key";
 
-    public static ApiFactory For(DatabaseFixture database, params Action<IServiceCollection>[] overrides)
+    /// <summary>
+    /// Supplies the internal key the host refuses to start without. Any test that builds the host
+    /// WITHOUT going through <see cref="For"/> must call this first: otherwise it only passes when an
+    /// earlier test in the run happened to set the (process-global) variable, or on a laptop whose
+    /// user-secrets hold the real key — and fails on a clean CI runner.
+    /// </summary>
+    public static void UseTestInternalKey()
     {
         Environment.SetEnvironmentVariable(InternalKeySecret.SecretId, TestInternalKey);
+    }
+
+    public static ApiFactory For(DatabaseFixture database, params Action<IServiceCollection>[] overrides)
+    {
+        UseTestInternalKey();
         var all = new List<Action<IServiceCollection>> { TestAccessTokens.TrustTestSigningKey, RemoveBackgroundWork };
         all.AddRange(overrides);
         return TestHost.For(database, all.ToArray());

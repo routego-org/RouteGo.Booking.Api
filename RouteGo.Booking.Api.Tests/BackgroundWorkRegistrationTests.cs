@@ -37,7 +37,9 @@ public sealed class BackgroundWorkRegistrationTests
             }
         }
 
-        // Act
+        // Act — TestHost.For (not BookingTestHost.For, which removes the very workers counted here),
+        // so the internal key must be supplied explicitly rather than inherited from an earlier test.
+        BookingTestHost.UseTestInternalKey();
         using ApiFactory factory = TestHost.For(_database, TestAccessTokens.TrustTestSigningKey, CountThenRemove);
         using HttpClient client = factory.CreateClient();
 
